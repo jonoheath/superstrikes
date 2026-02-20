@@ -1,1 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dominik Szoboszlai's Sensational Strikes</title>
+    <style>
+        body {
+            background-color: #222;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
 
+        h1 {
+            color: #D3171E; /* Liverpool Red */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+        }
+
+        #game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- Scoreboard Styles --- */
+        #scoreboard {
+            width: 800px; /* Matches canvas width */
+            display: flex;
+            justify-content: space-between;
+            background: #111;
+            padding: 10px 20px;
+            box-sizing: border-box;
+            border: 2px solid #555;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700; /* Gold text */
+        }
+        .lives-container {
+            color: white;
+        }
+
+        /* --- Canvas Styles --- */
+        canvas {
+            background-color: #2E8B57; /* Pitch Green fallback */
+            border: 2px solid #555;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+            border-radius: 0 0 8px 8px;
+        }
+
+        /* --- Pro UI Styles --- */
+        #pro-ui {
+            display: flex;
+            gap: 30px;
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            align-items: center;
+            margin-top: 20px;
+            border: 2px solid #444;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        /* Wind Indicator */
+        #wind-gauge {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #555;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #222;
+            position: relative;
+        }
+        #wind-arrow {
+            width: 0; 
+            height: 0; 
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 30px solid #D3171E; 
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 2D Contact Map (Curve & Dip) */
+        #contact-map {
+            width: 80px;
+            height: 80px;
+            background-color: #eee;
+            /* If you have the ball asset, uncomment the line below to use it as the background! */
+            /* background: url('assets/ball_sprite.png') center/cover; */
+            border-radius: 50%;
+            position: relative;
+            cursor: crosshair;
+            border: 2px solid #777;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+        #contact-point {
+            width: 12px;
+            height: 12px;
+            background: red;
+            border-radius: 50%;
+            position: absolute;
+            top: 34px; /* Center (80/2 - 6) */
+            left: 34px; /* Center */
+            pointer-events: none;
+            border: 2px solid white;
+            box-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+
+        /* Active Power Meter */
+        #power-container {
+            width: 150px;
+            height: 24px;
+            background: #222;
+            border: 2px solid #555;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        #power-bar-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #2E8B57 0%, #FFD700 70%, #D3171E 100%);
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        #power-cursor {
+            width: 6px;
+            height: 28px;
+            background: #fff;
+            position: absolute;
+            top: -2px;
+            left: 0%; 
+            box-shadow: 0 0 5px black;
+            border-radius: 3px;
+        }
+
+        /* Strike Button */
+        button {
+            padding: 10px 25px;
+            font-size: 18px;
+            font-weight: 900;
+            background-color: #D3171E;
+            color: white;
+            border: 2px solid #b01318;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        button:hover { 
+            background-color: #f01a22; 
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* Simple range slider styling for Direction */
+        input[type=range] {
+            cursor: pointer;
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dominik Szoboszlai's Sensational Strikes</h1>
+    
+    <div id="game-container">
+        <div id="scoreboard">
+            <div>SCORE: <span id="score-display">0</span></div>
+            <div class="lives-container">LIVES: <span id="lives-display">⚽⚽⚽</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div id="pro-ui">
+        <div class="control-group">
+            <span>WIND</span>
+            <div id="wind-gauge"><div id="wind-arrow"></div></div>
+        </div>
+
+        <div class="control-group">
+            <label for="direction">DIRECTION</label>
+            <input type="range" id="direction" min="-45" max="45" value="0">
+        </div>
+
+        <div class="control-group">
+            <span>CONTACT (Curve/Dip)</span>
+            <div id="contact-map">
+                <div id="contact-point"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <span>POWER</span>
+            <div id="power-container">
+                <div id="power-bar-fill"></div>
+                <div id="power-cursor"></div>
+            </div>
+            <button id="kickBtn" style="margin-top: 5px;">STRIKE!</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
