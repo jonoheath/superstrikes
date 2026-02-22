@@ -22,8 +22,8 @@ const MAGNUS_COEF = 0.006;
 const BOUNCE_DECAY = 0.5;
 
 const GOAL_HEIGHT = 45;
-const WALL_HEIGHT = 45; // Scaled up for zoom
-const GK_HEIGHT = 45;   // Scaled up for zoom
+const WALL_HEIGHT = 45; 
+const GK_HEIGHT = 45;   
 const GK_WIDTH = 30;
 
 let isKicking = false;
@@ -34,12 +34,15 @@ let trail = [];
 let score = 0;
 let lives = 3;
 
+// NEW: Radial Aiming Base Angle
+let baseAngle = 0; 
+
 let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 6, renderRadius: 6 };
 let playerStart = { x: 0, y: 0 };
 let wallPlayers = [];
 
-// Center Goal, perfectly aligned with our drawn pitch lines
-let goal = { x: 330, y: 80, width: 140, height: 25 }; 
+// Placed at the top-right corner to match your Diamond Pitch image
+let goal = { x: 440, y: 70, width: 90, height: 25 }; 
 let wind = { x: 0, y: 0 };
 let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 2.5 };
 
@@ -50,9 +53,10 @@ let powerDirection = 1;
 const powerSpeed = 1; 
 
 // ==========================================
-// Asset Loader (Pitch Image Removed!)
+// Asset Loader (Pitch is back!)
 // ==========================================
 const assets = {
+    pitch: new Image(),
     szoboszlai: new Image(),
     defender: new Image(),
     goal: new Image(),
@@ -60,6 +64,7 @@ const assets = {
     goalkeeper: new Image()
 };
 
+assets.pitch.src = 'assets/pitch_isometric.png';
 assets.szoboszlai.src = 'assets/szobo_kick.png';
 assets.defender.src = 'assets/defender_wall.png';
 assets.goal.src = 'assets/goal_net.png';
@@ -125,24 +130,40 @@ function setupScenario() {
     playDead = false;
     trail = [];
     
-    // Zoomed in: Ball placed closer to the center-bottom
-    ball.x = Math.random() * 300 + 250; 
-    ball.y = Math.random() * 100 + 350; 
+    // Spawn ball bottom-left of the diamond
+    ball.x = Math.random() * 80 + 180; 
+    ball.y = Math.random() * 80 + 320; 
     ball.z = 0;
     ball.vx = 0; ball.vy = 0; ball.vz = 0;
 
+    // --- NEW RADIAL AIMING MATH ---
+    // Calculate the exact angle from the ball to the center of the goal
+    const goalCenterX = goal.x + goal.width / 2;
+    const dy = goal.y - ball.y;
+    const dx = goalCenterX - ball.x;
+    baseAngle = Math.atan2(dy, dx); 
+
+    // Dynamically angle the wall to face the kick
     const numPlayers = Math.floor(Math.random() * 4) + 3;
     wallPlayers = [];
     
-    const goalCenterX = goal.x + goal.width / 2;
-    const distanceToGoal = ball.y - goal.y;
-    const wallY = ball.y - (distanceToGoal * 0.4); 
+    const distanceToGoal = Math.sqrt(dx*dx + dy*dy);
+    const wallDistance = distanceToGoal * 0.35; 
     
+    const wallCenterX = ball.x + Math.cos(baseAngle) * wallDistance;
+    const wallCenterY = ball.y + Math.sin(baseAngle) * wallDistance;
+    
+    // The wall stands on a line exactly perpendicular to the ball's path
+    const perpAngle = baseAngle + (Math.PI / 2);
     const SPACING = 16; 
-    const wallXStart = ball.x - ((numPlayers * SPACING) / 2) + ((goalCenterX - ball.x) * 0.3); 
     
     for(let i = 0; i < numPlayers; i++) {
-        wallPlayers.push({ x: wallXStart + (i * SPACING), y: wallY, width: 20, height: 45 });
+        const offset = (i - (numPlayers - 1) / 2) * SPACING;
+        wallPlayers.push({ 
+            x: wallCenterX + Math.cos(perpAngle) * offset, 
+            y: wallCenterY + Math.sin(perpAngle) * offset, 
+            width: 20, height: 45 
+        });
     }
 
     gk.x = goal.x + (goal.width / 2) - (GK_WIDTH / 2);
@@ -185,8 +206,12 @@ function update() {
         ball.z += ball.vz;
         
         ball.vz -= (GRAVITY + (strikeDip * 0.02));
-        ball.vx += (strikeCurve * ball.vy * MAGNUS_COEF);
-        ball.vy -= Math.abs(strikeCurve * ball.vx * MAGNUS_COEF * 0.1);
+        
+        // Upgraded 2D Vector Magnus Effect
+        const magX = -ball.vy * strikeCurve * MAGNUS_COEF;
+        const magY = ball.vx * strikeCurve * MAGNUS_COEF;
+        ball.vx += magX;
+        ball.vy += magY;
 
         ball.vx += wind.x;
         ball.vy += wind.y;
@@ -215,9 +240,7 @@ function update() {
             else if (ball.x < gkCenterX - 5) { gk.vx = -gk.speed; } 
             else { gk.vx = 0; }
             
-            if (ball.y < goal.y + 60 && ball.z > 10 && gk.z === 0) {
-                gk.vz = 3.5; 
-            }
+            if (ball.y < goal.y + 60 && ball.z > 10 && gk.z === 0) { gk.vz = 3.5; }
         }
 
         gk.x += gk.vx;
@@ -251,14 +274,9 @@ function update() {
             if (ball.y <= goalLine && (ball.y - ball.vy) > goalLine) {
                 playDead = true; 
                 if (ball.x > goal.x && ball.x < goal.x + goal.width) {
-                    if (ball.z <= GOAL_HEIGHT) {
-                        setTimeout(() => handleGoal(), 500);
-                    } else {
-                        setTimeout(() => handleMiss("Over the bar! Needed more dip."), 500);
-                    }
-                } else {
-                    setTimeout(() => handleMiss("Wide of the mark."), 500);
-                }
+                    if (ball.z <= GOAL_HEIGHT) { setTimeout(() => handleGoal(), 500); } 
+                    else { setTimeout(() => handleMiss("Over the bar! Needed more dip."), 500); }
+                } else { setTimeout(() => handleMiss("Wide of the mark."), 500); }
             }
 
             if (Math.abs(ball.vy) < 0.1 && ball.z === 0) {
@@ -269,42 +287,11 @@ function update() {
     }
 }
 
-// Custom Drawn Pitch to match the perspective perfectly
-function drawPitch() {
-    ctx.fillStyle = '#2E8B57';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = '#277a4c';
-    for (let i = -200; i < canvas.width; i += 80) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i + 80, 0);
-        ctx.lineTo(i - 150 + 80, canvas.height);
-        ctx.lineTo(i - 150, canvas.height);
-        ctx.fill();
-    }
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 3;
-    
-    const lineY = goal.y + goal.height; // Exactly aligns with the goal net base
-    ctx.beginPath(); ctx.moveTo(0, lineY); ctx.lineTo(800, lineY); ctx.stroke();
-    
-    // Penalty Box
-    ctx.strokeRect(150, lineY, 500, 160);
-    
-    // 6-yard Box
-    ctx.strokeRect(280, lineY, 240, 60);
-    
-    // Penalty arc
-    ctx.beginPath(); ctx.arc(400, lineY + 160, 70, 0, Math.PI); ctx.stroke();
-}
-
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Draw our custom perspective pitch
-    drawPitch();
+    // 1. Draw your image!
+    ctx.drawImage(assets.pitch, 0, 0, canvas.width, canvas.height);
 
     // 2. Goal Net
     ctx.drawImage(assets.goal, goal.x, goal.y - 30, goal.width, goal.height + 30);
@@ -313,12 +300,12 @@ function draw() {
     const gkVisualY = gk.y - gk.z;
     ctx.drawImage(assets.goalkeeper, gk.x, gkVisualY - GK_HEIGHT, GK_WIDTH, GK_HEIGHT * 1.5);
 
-    // 4. Wall
-    wallPlayers.forEach(p => {
+    // 4. Wall (Sorted by Y so players in front render properly)
+    wallPlayers.sort((a, b) => a.y - b.y).forEach(p => {
         ctx.drawImage(assets.defender, p.x, p.y - p.height, p.width, p.height * 2);
     });
 
-    // 5. Predictive Trajectory Simulator (NEW!)
+    // 5. Predictive Trajectory Simulator (Radial Vector Updated!)
     if (!isKicking && !isAnimating) {
         let simX = ball.x;
         let simY = ball.y;
@@ -326,36 +313,27 @@ function draw() {
         
         const direction = parseFloat(directionInput.value);
         const rad = direction * (Math.PI / 180);
+        const totalAngle = baseAngle + rad; 
         
-        let simVx = Math.sin(rad) * currentPower * 0.15;
-        let simVy = -currentPower * 0.15;
+        let simVx = Math.cos(totalAngle) * currentPower * 0.15;
+        let simVy = Math.sin(totalAngle) * currentPower * 0.15;
         let simVz = (currentPower * 0.04) + 1;
 
         ctx.beginPath();
         ctx.moveTo(simX, simY);
 
-        // Simulate flight for 60 frames
         for (let i = 0; i < 60; i++) {
-            simX += simVx;
-            simY += simVy;
-            simZ += simVz;
-
+            simX += simVx; simY += simVy; simZ += simVz;
             simVz -= (GRAVITY + (strikeDip * 0.02));
-            simVx += (strikeCurve * simVy * MAGNUS_COEF);
-            simVy -= Math.abs(strikeCurve * simVx * MAGNUS_COEF * 0.1);
+            
+            const magX = -simVy * strikeCurve * MAGNUS_COEF;
+            const magY = simVx * strikeCurve * MAGNUS_COEF;
+            simVx += magX; simVy += magY;
 
-            simVx += wind.x;
-            simVy += wind.y;
-            simVx *= DRAG;
-            simVy *= DRAG;
-            simVz *= DRAG;
+            simVx += wind.x; simVy += wind.y;
+            simVx *= DRAG; simVy *= DRAG; simVz *= DRAG;
 
-            if (simZ < 0) {
-                simZ = 0;
-                ctx.lineTo(simX, simY);
-                break; 
-            }
-
+            if (simZ < 0) { simZ = 0; ctx.lineTo(simX, simY); break; }
             const visualY = simY - (simZ * 0.5);
             ctx.lineTo(simX, visualY);
         }
@@ -366,14 +344,13 @@ function draw() {
         ctx.stroke();
         ctx.setLineDash([]);
         
-        // Landing target dot
         ctx.beginPath();
         ctx.arc(simX, simY - (simZ * 0.5), 4, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 0, 0, 0.9)'; 
         ctx.fill();
     }
 
-    // 6. Szoboszlai (Scaled up for zoom)
+    // 6. Szoboszlai 
     if (isAnimating) {
         const currentX = playerStart.x + ((ball.x - 20 - playerStart.x) * (animProgress / 100));
         const currentY = playerStart.y + ((ball.y - 10 - playerStart.y) * (animProgress / 100));
@@ -395,7 +372,7 @@ function draw() {
         ctx.stroke();
     }
 
-    // 8. Ball Shadow & Sprite
+    // 8. Ball
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.baseRadius, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.5 - (ball.z * 0.01))})`;
@@ -432,9 +409,10 @@ kickBtn.addEventListener('click', () => {
     if (!isKicking && !isAnimating) {
         const direction = parseFloat(directionInput.value);
         const rad = direction * (Math.PI / 180);
+        const totalAngle = baseAngle + rad; 
         
-        ball.targetVy = -currentPower * 0.15;
-        ball.targetVx = Math.sin(rad) * currentPower * 0.15;
+        ball.targetVx = Math.cos(totalAngle) * currentPower * 0.15;
+        ball.targetVy = Math.sin(totalAngle) * currentPower * 0.15;
         ball.targetVz = (currentPower * 0.04) + 1; 
         
         isAnimating = true;
