@@ -16,15 +16,17 @@ const livesDisplay = document.getElementById('lives-display');
 // ==========================================
 // Game Constants & State
 // ==========================================
-// Physics
-const GRAVITY = 0.4;
+// Physics (Tweaked for slower, visible ball flight)
+const GRAVITY = 0.2;        // Was 0.4. Lowered so the slower ball stays in the air
 const DRAG = 0.985;
-const MAGNUS_COEF = 0.008;
+const MAGNUS_COEF = 0.006;  // Adjusted for slower speed
 const BOUNCE_DECAY = 0.5;
+
+// Perspective and Hitboxes (Scaled down to make pitch feel larger)
 const GOAL_HEIGHT = 45;
 const WALL_HEIGHT = 35;
-const GK_HEIGHT = 40;
-const GK_WIDTH = 30;
+const GK_HEIGHT = 35;       // Was 40
+const GK_WIDTH = 25;        // Was 30
 
 // Game State
 let isKicking = false;
@@ -38,20 +40,21 @@ let score = 0;
 let lives = 3;
 
 // Objects
-let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 6, renderRadius: 6 };
+let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 5, renderRadius: 5 };
 let playerStart = { x: 0, y: 0 };
 let wallPlayers = [];
-let goal = { x: 300, y: 50, width: 200, height: 20 };
-let penaltyBox = { x: 150, y: 50, width: 500, height: 150 };
+
+// Goal is statically positioned (Fits a top-right isometric pitch view)
+let goal = { x: 450, y: 60, width: 140, height: 25 }; 
 let wind = { x: 0, y: 0 };
-let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 3.5 };
+let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 2.5 };
 
 // Pro UI State
 let strikeCurve = 0;
 let strikeDip = 0;
 let currentPower = 20;
 let powerDirection = 1;
-const powerSpeed = 2;
+const powerSpeed = 1; // Slowed down from 2 for easier clicking
 
 // ==========================================
 // Asset Loader
@@ -65,7 +68,6 @@ const assets = {
     goalkeeper: new Image()
 };
 
-// Note: Ensure you have these placeholder images in an 'assets' folder
 assets.pitch.src = 'assets/pitch_isometric.png';
 assets.szoboszlai.src = 'assets/szobo_kick.png';
 assets.defender.src = 'assets/defender_wall.png';
@@ -81,7 +83,7 @@ for (let key in assets) {
         imagesLoaded++;
         if (imagesLoaded === totalImages) {
             resetGame();
-            loop(); // Start game loop
+            loop(); 
         }
     };
 }
@@ -120,6 +122,10 @@ function handleMiss(message) {
 function resetGame() {
     score = 0;
     lives = 3;
+    isKicking = false;
+    isAnimating = false;
+    playDead = false;
+    trail = [];
     updateScoreboard();
     setupScenario();
 }
@@ -130,22 +136,27 @@ function setupScenario() {
     playDead = false;
     trail = [];
     
-    // 1. Randomize Ball (Outside box)
-    ball.x = Math.random() * 400 + 200; 
-    ball.y = Math.random() * 200 + 250; 
+    // 1. Randomize Ball (Further back to fit the new goal position)
+    ball.x = Math.random() * 300 + 150; 
+    ball.y = Math.random() * 150 + 300; 
     ball.z = 0;
     ball.vx = 0; ball.vy = 0; ball.vz = 0;
 
-    // 2. Randomize Wall
+    // 2. Randomize Wall (Tighter Spacing)
     const numPlayers = Math.floor(Math.random() * 4) + 3;
     wallPlayers = [];
+    
+    // Calculate wall position between ball and goal
     const goalCenterX = goal.x + goal.width / 2;
     const distanceToGoal = ball.y - goal.y;
-    const wallY = ball.y - (distanceToGoal * 0.3); 
-    const wallXStart = ball.x - ((numPlayers * 15) / 2); 
+    const wallY = ball.y - (distanceToGoal * 0.35); 
+    
+    // Tighter spacing: 14 pixels apart instead of 20
+    const SPACING = 14; 
+    const wallXStart = ball.x - ((numPlayers * SPACING) / 2) + ((goalCenterX - ball.x) * 0.3); 
     
     for(let i = 0; i < numPlayers; i++) {
-        wallPlayers.push({ x: wallXStart + (i * 20), y: wallY, width: 15, height: 30 });
+        wallPlayers.push({ x: wallXStart + (i * SPACING), y: wallY, width: 16, height: 35 });
     }
 
     // 3. Reset GK
@@ -156,10 +167,10 @@ function setupScenario() {
     gk.vz = 0;
 
     // 4. Randomize Wind
-    wind.x = (Math.random() * 0.1) - 0.05; 
-    wind.y = (Math.random() * 0.1) - 0.05; 
+    wind.x = (Math.random() * 0.06) - 0.03; 
+    wind.y = (Math.random() * 0.06) - 0.03; 
     const windAngle = Math.atan2(wind.y, wind.x) * (180 / Math.PI);
-    windArrow.style.transform = `rotate(${windAngle + 90}deg)`; // +90 to align CSS triangle
+    windArrow.style.transform = `rotate(${windAngle + 90}deg)`; 
 }
 
 function updatePowerMeter() {
@@ -175,7 +186,7 @@ function updatePowerMeter() {
 
 function update() {
     if (isAnimating) {
-        animProgress += 5;
+        animProgress += 8; // Faster run-up
         if (animProgress >= 100) {
             isAnimating = false;
             isKicking = true;
@@ -191,7 +202,7 @@ function update() {
         ball.z += ball.vz;
         
         // Gravity + Dip
-        ball.vz -= (GRAVITY + (strikeDip * 0.05));
+        ball.vz -= (GRAVITY + (strikeDip * 0.02));
 
         // Magnus Effect (Curve)
         ball.vx += (strikeCurve * ball.vy * MAGNUS_COEF);
@@ -205,7 +216,7 @@ function update() {
         ball.vz *= DRAG;
 
         // Perspective
-        ball.renderRadius = ball.baseRadius + (ball.z * 0.15);
+        ball.renderRadius = ball.baseRadius + (ball.z * 0.12);
         if (ball.renderRadius < ball.baseRadius) ball.renderRadius = ball.baseRadius;
 
         // Trail Record
@@ -223,14 +234,14 @@ function update() {
         }
 
         // --- Goalkeeper AI ---
-        if (ball.y < wallPlayers[0].y + 50 && !playDead) {
+        if (ball.y < wallPlayers[0].y + 30 && !playDead) {
             const gkCenterX = gk.x + (GK_WIDTH / 2);
             if (ball.x > gkCenterX + 5) { gk.vx = gk.speed; } 
             else if (ball.x < gkCenterX - 5) { gk.vx = -gk.speed; } 
             else { gk.vx = 0; }
             
-            if (ball.y < goal.y + 80 && ball.z > 15 && gk.z === 0) {
-                gk.vz = 4; // Jump
+            if (ball.y < goal.y + 60 && ball.z > 10 && gk.z === 0) {
+                gk.vz = 3; // Jump
             }
         }
 
@@ -295,7 +306,7 @@ function draw() {
     ctx.drawImage(assets.pitch, 0, 0, canvas.width, canvas.height);
 
     // 2. Goal
-    ctx.drawImage(assets.goal, goal.x, goal.y - 40, goal.width, goal.height + 40);
+    ctx.drawImage(assets.goal, goal.x, goal.y - 30, goal.width, goal.height + 30);
 
     // 3. Goalkeeper
     const gkVisualY = gk.y - gk.z;
@@ -306,18 +317,46 @@ function draw() {
         ctx.drawImage(assets.defender, p.x, p.y - p.height, p.width, p.height * 2);
     });
 
-    // 5. Szoboszlai
-    if (isAnimating) {
-        const currentX = playerStart.x + ((ball.x - 30 - playerStart.x) * (animProgress / 100));
-        const currentY = playerStart.y + ((ball.y - 10 - playerStart.y) * (animProgress / 100));
-        ctx.drawImage(assets.szoboszlai, currentX, currentY, 40, 60);
-    } else if (!isKicking) {
-        ctx.drawImage(assets.szoboszlai, playerStart.x || ball.x - 60, playerStart.y || ball.y + 60, 40, 60);
-    } else {
-        ctx.drawImage(assets.szoboszlai, ball.x - 30, ball.y - 10, 40, 60);
+    // 5. On-Pitch Targeting Arrow (NEW!)
+    if (!isKicking && !isAnimating) {
+        const direction = parseFloat(directionInput.value);
+        const rad = direction * (Math.PI / 180);
+        const lineLength = 70;
+        
+        // Calculate where the arrow points
+        const endX = ball.x + Math.sin(rad) * lineLength;
+        const endY = ball.y - Math.cos(rad) * lineLength;
+
+        // Draw dashed line
+        ctx.beginPath();
+        ctx.moveTo(ball.x, ball.y);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)'; // Yellow targeting line
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset for other drawings
+
+        // Draw arrowhead dot
+        ctx.beginPath();
+        ctx.arc(endX, endY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
+        ctx.fill();
     }
 
-    // 6. Trail
+    // 6. Szoboszlai
+    if (isAnimating) {
+        const currentX = playerStart.x + ((ball.x - 15 - playerStart.x) * (animProgress / 100));
+        const currentY = playerStart.y + ((ball.y - 5 - playerStart.y) * (animProgress / 100));
+        ctx.drawImage(assets.szoboszlai, currentX, currentY, 35, 55);
+    } else if (!isKicking) {
+        // Moved much closer! He stands right next to the ball now.
+        ctx.drawImage(assets.szoboszlai, ball.x - 20, ball.y - 45, 35, 55);
+    } else {
+        ctx.drawImage(assets.szoboszlai, ball.x - 15, ball.y - 15, 35, 55);
+    }
+
+    // 7. Trail
     if (trail.length > 1) {
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
@@ -328,7 +367,7 @@ function draw() {
         ctx.stroke();
     }
 
-    // 7. Ball Shadow & Sprite
+    // 8. Ball Shadow & Sprite
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.baseRadius, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0.1, 0.5 - (ball.z * 0.01))})`;
@@ -349,6 +388,8 @@ function loop() {
 // ==========================================
 // Event Listeners
 // ==========================================
+
+// Fixed Contact Map Math (Inverted so top=dip, left=right swerve)
 contactMap.addEventListener('click', (e) => {
     const rect = contactMap.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -357,8 +398,9 @@ contactMap.addEventListener('click', (e) => {
     contactPoint.style.left = `${x - 6}px`; 
     contactPoint.style.top = `${y - 6}px`;
 
-    strikeCurve = ((x / 100) * 10) - 5; 
-    strikeDip = ((y / 100) * 10) - 5;   
+    // Added negatives to invert the axes to realistic physics
+    strikeCurve = -(((x / 100) * 10) - 5); 
+    strikeDip = -(((y / 100) * 10) - 5);   
 });
 
 kickBtn.addEventListener('click', () => {
@@ -366,12 +408,17 @@ kickBtn.addEventListener('click', () => {
         const direction = parseFloat(directionInput.value);
         const rad = direction * (Math.PI / 180);
         
-        ball.targetVy = -currentPower * 0.25;
-        ball.targetVx = Math.sin(rad) * currentPower * 0.25;
-        ball.targetVz = (120 - currentPower) * 0.12; 
+        // Multipliers lowered from 0.25 to 0.15 for much smoother speed
+        ball.targetVy = -currentPower * 0.15;
+        ball.targetVx = Math.sin(rad) * currentPower * 0.15;
+        
+        // Fixed loft math: Weak power = weak lift, Strong power = high lift
+        ball.targetVz = (currentPower * 0.04) + 1; 
         
         isAnimating = true;
         animProgress = 0;
-        playerStart = { x: ball.x - 60, y: ball.y + 60 };
+        
+        // Run-up starts closer now
+        playerStart = { x: ball.x - 30, y: ball.y + 30 };
     }
 });
