@@ -41,8 +41,8 @@ let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, ta
 let playerStart = { x: 0, y: 0 };
 let wallPlayers = [];
 
-// Placed on the top-right edge of the diamond pitch
-let goal = { x: 500, y: 130, width: 80, height: 40 }; 
+// NEW: Locked to the top-right of the 800x500 canvas blueprint
+let goal = { x: 550, y: 100, width: 100, height: 40 }; 
 let wind = { x: 0, y: 0 };
 let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 2.5 };
 
@@ -130,9 +130,9 @@ function setupScenario() {
     playDead = false;
     trail = [];
     
-    // Spawn ball bottom-left of the diamond
-    ball.x = Math.random() * 150 + 200; 
-    ball.y = Math.random() * 80 + 320;  
+    // NEW: Spawns strictly in the bottom-left grass area
+    ball.x = Math.random() * 150 + 150; // Between X: 150 and 300
+    ball.y = Math.random() * 100 + 350; // Between Y: 350 and 450
     ball.z = 0;
     ball.vx = 0; ball.vy = 0; ball.vz = 0;
 
@@ -164,8 +164,9 @@ function setupScenario() {
         });
     }
 
+    // NEW: Anchor the GK perfectly to the new goal coordinates
     gk.x = goal.x + (goal.width / 2) - (GK_WIDTH / 2);
-    gk.y = goal.y + 5; 
+    gk.y = goal.y + 20; 
     gk.z = 0;
     gk.vx = 0;
     gk.vz = 0;
