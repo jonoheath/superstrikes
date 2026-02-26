@@ -18,7 +18,7 @@ const livesDisplay = document.getElementById('lives-display');
 // ==========================================
 // 1. The Physics Hitbox (Move this until the RED BOX sits on your white grass line)
 // Pulled left and down to match your new pitch
-let goal = { x: 490, y: 250, width: 120, height: 40 }; 
+let goal = { x: 490, y: 50, width: 120, height: 40 }; 
 
 // 2. The Visual Image (Aligns the picture over the red box)
 const VISUAL_GOAL_WIDTH = 200;  
