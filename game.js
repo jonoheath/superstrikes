@@ -18,7 +18,7 @@ const livesDisplay = document.getElementById('lives-display');
 // ==========================================
 // 1. The Physics Hitbox (Align this with your white grass lines first!)
 // I moved this left (from 580 to 480) and slightly up to match your new pitch
-let goal = { x: 480, y: 120, width: 140, height: 40 }; 
+let goal = { x: 490, y: 120, width: 140, height: 40 }; 
 
 // 2. The Visual Image (Aligns the picture over the physics box)
 const VISUAL_GOAL_WIDTH = 200;  // Matches the 200px width from your editor screenshot
