@@ -14,13 +14,26 @@ const scoreDisplay = document.getElementById('score-display');
 const livesDisplay = document.getElementById('lives-display');
 
 // ==========================================
+// GOAL ALIGNMENT TUNING
+// ==========================================
+// 1. The Physics Hitbox (Align this with your white grass lines first!)
+// I moved this left (from 580 to 480) and slightly up to match your new pitch
+let goal = { x: 480, y: 120, width: 140, height: 40 }; 
+
+// 2. The Visual Image (Aligns the picture over the physics box)
+const VISUAL_GOAL_WIDTH = 200;  // Matches the 200px width from your editor screenshot
+const VISUAL_GOAL_HEIGHT = 120; // Height of the image (keep it tall so it doesn't squish)
+const VISUAL_OFFSET_X = 30;     // (200 - 140) / 2 = 30. Centers the image over the hitbox horizontally.
+const VISUAL_OFFSET_Y = 80;     // Pulls the image up so the bottom posts rest on the hitbox line.
+
+// ==========================================
 // Game Constants & State
 // ==========================================
 const GRAVITY = 0.2;        
-const DRAG = 0.992;         // Glides further on the big pitch
+const DRAG = 0.992;         
 const MAGNUS_COEF = 0.006;  
 const BOUNCE_DECAY = 0.5;
-const POWER_MULT = 0.24;    // Hits harder for the bigger pitch
+const POWER_MULT = 0.24;    
 
 const GOAL_HEIGHT = 60;     
 const WALL_HEIGHT = 50; 
@@ -38,13 +51,10 @@ let lives = 3;
 // Radial Aiming Base Angle
 let baseAngle = 0; 
 
-// Track starting position so Dominik doesn't surf the ball
 let ball = { x: 0, y: 0, z: 0, startX: 0, startY: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 6, renderRadius: 6 };
 let playerStart = { x: 0, y: 0 };
 let wallPlayers = [];
 
-// NEW: Wider invisible collision box that sits on your white line
-let goal = { x: 580, y: 150, width: 140, height: 50 }; 
 let wind = { x: 0, y: 0 };
 let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 3.0 };
 
@@ -294,18 +304,14 @@ function draw() {
     // 1. Draw pitch
     ctx.drawImage(assets.pitch, 0, 0, canvas.width, canvas.height);
 
-    // 2. Goal Net (NEW: Decoupled from hitbox to prevent squishing)
-    const visualGoalWidth = 180;  // Adjust this to make the net visually wider
-    const visualGoalHeight = 100; // Adjust this to make the net visually taller
-    const visualOffsetX = 20;     // Shifts the image left to center it over the hitbox
-    const visualOffsetY = 40;     // Shifts the image up so the posts touch the ground
-
+    // 2. Goal Net
+    // Uses the new visual tuning variables from the top of the script
     ctx.drawImage(
         assets.goal, 
-        goal.x - visualOffsetX, 
-        goal.y - visualOffsetY, 
-        visualGoalWidth, 
-        visualGoalHeight
+        goal.x - VISUAL_OFFSET_X, 
+        goal.y - VISUAL_OFFSET_Y, 
+        VISUAL_GOAL_WIDTH, 
+        VISUAL_GOAL_HEIGHT
     );
 
     // 3. Goalkeeper
