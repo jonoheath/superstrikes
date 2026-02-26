@@ -16,15 +16,15 @@ const livesDisplay = document.getElementById('lives-display');
 // ==========================================
 // GOAL ALIGNMENT TUNING
 // ==========================================
-// 1. The Physics Hitbox (Align this with your white grass lines first!)
-// I moved this left (from 580 to 480) and slightly up to match your new pitch
-let goal = { x: 490, y: 120, width: 140, height: 40 }; 
+// 1. The Physics Hitbox (Where the ball actually registers a goal)
+// Moved down and right to match the white lines in your new pitch
+let goal = { x: 540, y: 190, width: 120, height: 40 }; 
 
 // 2. The Visual Image (Aligns the picture over the physics box)
-const VISUAL_GOAL_WIDTH = 200;  // Matches the 200px width from your editor screenshot
-const VISUAL_GOAL_HEIGHT = 120; // Height of the image (keep it tall so it doesn't squish)
-const VISUAL_OFFSET_X = 30;     // (200 - 140) / 2 = 30. Centers the image over the hitbox horizontally.
-const VISUAL_OFFSET_Y = 80;     // Pulls the image up so the bottom posts rest on the hitbox line.
+const VISUAL_GOAL_WIDTH = 200;  // Matches the width from your editor screenshot
+const VISUAL_GOAL_HEIGHT = 90;  // Kept a bit taller than 60 so it doesn't look flattened
+const VISUAL_OFFSET_X = 40;     // Centers the 200px image over the 120px hitbox
+const VISUAL_OFFSET_Y = 60;     // Pulls the image up so the bottom posts rest on the hitbox line
 
 // ==========================================
 // Game Constants & State
