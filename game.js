@@ -16,15 +16,15 @@ const livesDisplay = document.getElementById('lives-display');
 // ==========================================
 // GOAL ALIGNMENT TUNING
 // ==========================================
-// 1. The Physics Hitbox (Where the ball actually registers a goal)
-// Moved down and right to match the white lines in your new pitch
-let goal = { x: 540, y: 190, width: 120, height: 40 }; 
+// 1. The Physics Hitbox (Move this until the RED BOX sits on your white grass line)
+// Pulled left and down to match your new pitch
+let goal = { x: 490, y: 250, width: 120, height: 40 }; 
 
-// 2. The Visual Image (Aligns the picture over the physics box)
-const VISUAL_GOAL_WIDTH = 200;  // Matches the width from your editor screenshot
-const VISUAL_GOAL_HEIGHT = 90;  // Kept a bit taller than 60 so it doesn't look flattened
-const VISUAL_OFFSET_X = 40;     // Centers the 200px image over the 120px hitbox
-const VISUAL_OFFSET_Y = 60;     // Pulls the image up so the bottom posts rest on the hitbox line
+// 2. The Visual Image (Aligns the picture over the red box)
+const VISUAL_GOAL_WIDTH = 200;  
+const VISUAL_GOAL_HEIGHT = 90;  
+const VISUAL_OFFSET_X = 40;     // (200 - 120) / 2 = 40. Centers the image perfectly.
+const VISUAL_OFFSET_Y = 50;     // Pulls the image up so posts rest on the bottom of the red box.
 
 // ==========================================
 // Game Constants & State
@@ -321,6 +321,11 @@ function draw() {
     // 4. Wall
     wallPlayers.sort((a, b) => a.y - b.y).forEach(p => {
         ctx.drawImage(assets.defender, p.x, p.y - p.height, p.width, p.height * 2);
+
+        // DEVELOPER DEBUG: Draw the invisible physics boxes
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(goal.x, goal.y, goal.width, goal.height);
     });
 
     // 5. Predictive Trajectory Simulator 
