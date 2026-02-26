@@ -17,14 +17,15 @@ const livesDisplay = document.getElementById('lives-display');
 // Game Constants & State
 // ==========================================
 const GRAVITY = 0.2;        
-const DRAG = 0.985;
+const DRAG = 0.992;         // Glides further on the big pitch
 const MAGNUS_COEF = 0.006;  
 const BOUNCE_DECAY = 0.5;
+const POWER_MULT = 0.24;    // Hits harder for the bigger pitch
 
-const GOAL_HEIGHT = 45;
-const WALL_HEIGHT = 45; 
-const GK_HEIGHT = 45;   
-const GK_WIDTH = 30;
+const GOAL_HEIGHT = 60;     
+const WALL_HEIGHT = 50; 
+const GK_HEIGHT = 55;       
+const GK_WIDTH = 35;
 
 let isKicking = false;
 let isAnimating = false;
@@ -37,14 +38,15 @@ let lives = 3;
 // Radial Aiming Base Angle
 let baseAngle = 0; 
 
-let ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 6, renderRadius: 6 };
+// Track starting position so Dominik doesn't surf the ball
+let ball = { x: 0, y: 0, z: 0, startX: 0, startY: 0, vx: 0, vy: 0, vz: 0, targetVx: 0, targetVy: 0, targetVz: 0, baseRadius: 6, renderRadius: 6 };
 let playerStart = { x: 0, y: 0 };
 let wallPlayers = [];
 
-// NEW: Locked to the top-right of the 800x500 canvas blueprint
-let goal = { x: 550, y: 100, width: 100, height: 40 }; 
+// NEW: Wider invisible collision box that sits on your white line
+let goal = { x: 580, y: 150, width: 140, height: 50 }; 
 let wind = { x: 0, y: 0 };
-let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 2.5 };
+let gk = { x: 0, y: 0, z: 0, vx: 0, vz: 0, speed: 3.0 };
 
 let strikeCurve = 0;
 let strikeDip = 0;
@@ -130,9 +132,11 @@ function setupScenario() {
     playDead = false;
     trail = [];
     
-    // NEW: Spawns strictly in the bottom-left grass area
-    ball.x = Math.random() * 150 + 150; // Between X: 150 and 300
-    ball.y = Math.random() * 100 + 350; // Between Y: 350 and 450
+    // Spawns strictly in the bottom-left grass area
+    ball.x = Math.random() * 150 + 150; 
+    ball.y = Math.random() * 100 + 350; 
+    ball.startX = ball.x; 
+    ball.startY = ball.y; 
     ball.z = 0;
     ball.vx = 0; ball.vy = 0; ball.vz = 0;
 
@@ -160,13 +164,12 @@ function setupScenario() {
         wallPlayers.push({ 
             x: wallCenterX + Math.cos(perpAngle) * offset, 
             y: wallCenterY + Math.sin(perpAngle) * offset, 
-            width: 20, height: 45 
+            width: 20, height: 50 
         });
     }
 
-    // NEW: Anchor the GK perfectly to the new goal coordinates
     gk.x = goal.x + (goal.width / 2) - (GK_WIDTH / 2);
-    gk.y = goal.y + 20; 
+    gk.y = goal.y + 10; 
     gk.z = 0;
     gk.vx = 0;
     gk.vz = 0;
@@ -238,7 +241,7 @@ function update() {
             else if (ball.x < gkCenterX - 5) { gk.vx = -gk.speed; } 
             else { gk.vx = 0; }
             
-            if (ball.y < goal.y + 60 && ball.z > 10 && gk.z === 0) { gk.vz = 3.5; }
+            if (ball.y < goal.y + 60 && ball.z > 10 && gk.z === 0) { gk.vz = 4.0; }
         }
 
         gk.x += gk.vx;
@@ -291,19 +294,30 @@ function draw() {
     // 1. Draw pitch
     ctx.drawImage(assets.pitch, 0, 0, canvas.width, canvas.height);
 
-    // 2. Goal Net
-    ctx.drawImage(assets.goal, goal.x, goal.y - 30, goal.width, goal.height + 30);
+    // 2. Goal Net (NEW: Decoupled from hitbox to prevent squishing)
+    const visualGoalWidth = 180;  // Adjust this to make the net visually wider
+    const visualGoalHeight = 100; // Adjust this to make the net visually taller
+    const visualOffsetX = 20;     // Shifts the image left to center it over the hitbox
+    const visualOffsetY = 40;     // Shifts the image up so the posts touch the ground
+
+    ctx.drawImage(
+        assets.goal, 
+        goal.x - visualOffsetX, 
+        goal.y - visualOffsetY, 
+        visualGoalWidth, 
+        visualGoalHeight
+    );
 
     // 3. Goalkeeper
     const gkVisualY = gk.y - gk.z;
     ctx.drawImage(assets.goalkeeper, gk.x, gkVisualY - GK_HEIGHT, GK_WIDTH, GK_HEIGHT * 1.5);
 
-    // 4. Wall (Sorted by Y so players in front render properly)
+    // 4. Wall
     wallPlayers.sort((a, b) => a.y - b.y).forEach(p => {
         ctx.drawImage(assets.defender, p.x, p.y - p.height, p.width, p.height * 2);
     });
 
-    // 5. Predictive Trajectory Simulator (Fixed Power Line)
+    // 5. Predictive Trajectory Simulator 
     if (!isKicking && !isAnimating) {
         let simX = ball.x;
         let simY = ball.y;
@@ -313,11 +327,10 @@ function draw() {
         const rad = direction * (Math.PI / 180);
         const totalAngle = baseAngle + rad; 
         
-        // Lock the simulation power so the line doesn't bounce!
         const simPower = 85; 
         
-        let simVx = Math.cos(totalAngle) * simPower * 0.15;
-        let simVy = Math.sin(totalAngle) * simPower * 0.15;
+        let simVx = Math.cos(totalAngle) * simPower * POWER_MULT;
+        let simVy = Math.sin(totalAngle) * simPower * POWER_MULT;
         let simVz = (simPower * 0.04) + 1;
 
         ctx.beginPath();
@@ -351,15 +364,15 @@ function draw() {
         ctx.fill();
     }
 
-    // 6. Szoboszlai 
+    // 6. Szoboszlai
     if (isAnimating) {
-        const currentX = playerStart.x + ((ball.x - 20 - playerStart.x) * (animProgress / 100));
-        const currentY = playerStart.y + ((ball.y - 10 - playerStart.y) * (animProgress / 100));
+        const currentX = playerStart.x + ((ball.startX - 20 - playerStart.x) * (animProgress / 100));
+        const currentY = playerStart.y + ((ball.startY - 10 - playerStart.y) * (animProgress / 100));
         ctx.drawImage(assets.szoboszlai, currentX, currentY, 45, 70);
     } else if (!isKicking) {
         ctx.drawImage(assets.szoboszlai, ball.x - 25, ball.y - 60, 45, 70);
     } else {
-        ctx.drawImage(assets.szoboszlai, ball.x - 20, ball.y - 20, 45, 70);
+        ctx.drawImage(assets.szoboszlai, ball.startX - 20, ball.startY - 20, 45, 70);
     }
 
     // 7. Trail
@@ -412,12 +425,12 @@ kickBtn.addEventListener('click', () => {
         const rad = direction * (Math.PI / 180);
         const totalAngle = baseAngle + rad; 
         
-        ball.targetVx = Math.cos(totalAngle) * currentPower * 0.15;
-        ball.targetVy = Math.sin(totalAngle) * currentPower * 0.15;
+        ball.targetVx = Math.cos(totalAngle) * currentPower * POWER_MULT;
+        ball.targetVy = Math.sin(totalAngle) * currentPower * POWER_MULT;
         ball.targetVz = (currentPower * 0.04) + 1; 
         
         isAnimating = true;
         animProgress = 0;
-        playerStart = { x: ball.x - 30, y: ball.y + 30 };
+        playerStart = { x: ball.startX - 30, y: ball.startY + 30 };
     }
 });
